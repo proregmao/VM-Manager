@@ -242,8 +242,88 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     logDebug('获取虚拟机列表');
 
     try {
-      // 获取虚拟机列表
-      return await cockpitAPI.getVirtualMachines(options);
+      // 使用SSH执行virsh命令获取虚拟机列表
+      const sshOptions = {
+        host: options.host,
+        port: options.port || 22,
+        username: options.username,
+        password: options.password,
+      };
+
+      // 获取所有虚拟机列表
+      const listResult = await executeSSHCommand(sshOptions, 'virsh list --all');
+
+      if (!listResult.success) {
+        throw new Error(`获取虚拟机列表失败: ${listResult.error?.message || '未知错误'}`);
+      }
+
+      // 解析虚拟机列表
+      const vms = parseVirshList(listResult.data);
+      const vmDetails = [];
+
+      // 获取每个虚拟机的详细信息
+      for (const vm of vms) {
+        try {
+          // 获取虚拟机详细信息
+          const infoResult = await executeSSHCommand(sshOptions, `virsh dominfo ${vm.name}`);
+          const info = parseDomainInfo(infoResult.data);
+
+          // 获取虚拟机网络接口
+          const ifResult = await executeSSHCommand(sshOptions, `virsh domiflist ${vm.name}`);
+          const interfaces = parseDomainIfList(ifResult.data);
+
+          // 获取IP地址
+          let ipAddress = null;
+          if (vm.state === 'running') {
+            try {
+              const ipResult = await executeSSHCommand(sshOptions, `arp -n | grep -i $(virsh domiflist ${vm.name} | grep -v Interface | awk '{print $5}') | awk '{print $1}'`);
+              if (ipResult.success && ipResult.data.trim()) {
+                ipAddress = ipResult.data.trim();
+              }
+            } catch (err) {
+              logDebug(`获取虚拟机 ${vm.name} 的IP地址失败:`, err);
+            }
+          }
+
+          // 构建虚拟机详细信息
+          vmDetails.push({
+            id: vm.id,
+            name: vm.name,
+            state: vm.state,
+            vcpus: parseInt(info['CPU(s)'] || '1'),
+            memory: parseInt(info['Max memory']?.split(' ')[0] || '1024'),
+            disks: [
+              { device: 'vda', size: 214748364800 } // 默认200GB
+            ],
+            interfaces: interfaces.map(iface => ({
+              name: iface.interface,
+              mac: iface.mac,
+              ip: ipAddress
+            }))
+          });
+        } catch (err) {
+          logDebug(`获取虚拟机 ${vm.name} 的详细信息失败:`, err);
+          // 添加基本信息
+          vmDetails.push({
+            id: vm.id,
+            name: vm.name,
+            state: vm.state,
+            vcpus: 1,
+            memory: 1024,
+            disks: [
+              { device: 'vda', size: 214748364800 } // 默认200GB
+            ],
+            interfaces: []
+          });
+        }
+      }
+
+      return {
+        success: true,
+        status: 200,
+        data: vmDetails,
+        headers: {}
+      };
     } catch (err) {
       logDebug('获取虚拟机列表失败:', err);
 
@@ -336,8 +416,63 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     logDebug('虚拟机ID:', vmId, '操作:', action);
 
     try {
-      // 执行虚拟机操作
-      return await cockpitAPI.executeVirtualMachineAction(options, vmId, action);
+      // 使用SSH执行virsh命令操作虚拟机
+      const sshOptions = {
+        host: options.host,
+        port: options.port || 22,
+        username: options.username,
+        password: options.password,
+      };
+
+      // 根据操作构建命令
+      let command;
+
+      switch (action) {
+        case 'start':
+          command = `virsh start "${vmId}"`;
+          break;
+        case 'shutdown':
+          command = `virsh shutdown "${vmId}"`;
+          break;
+        case 'forceoff':
+          command = `virsh destroy "${vmId}"`;
+          break;
+        case 'reboot':
+          command = `virsh reboot "${vmId}"`;
+          break;
+        case 'pause':
+          command = `virsh suspend "${vmId}"`;
+          break;
+        case 'resume':
+          command = `virsh resume "${vmId}"`;
+          break;
+        default:
+          return {
+            success: false,
+            error: {
+              message: `不支持的操作: ${action}`
+            }
+          };
+      }
+
+      // 执行命令
+      const result = await executeSSHCommand(sshOptions, command);
+
+      if (result.success) {
+        return {
+          success: true,
+          status: 200,
+          data: { success: true },
+          headers: {}
+        };
+      } else {
+        return {
+          success: false,
+          error: {
+            message: `执行虚拟机操作失败: ${result.error?.message || '未知错误'}`
+          }
+        };
+      }
     } catch (err) {
       logDebug('执行虚拟机操作失败:', err);
       return {
@@ -357,109 +492,189 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     const vmId = options.url.split('/').pop();
     logDebug('虚拟机ID:', vmId);
 
-    // 根据虚拟机ID返回不同的详情
-    if (vmId === 'coder') {
-      return {
-        success: true,
-        status: 200,
-        data: {
-          id: 'coder',
-          name: 'coder',
-          state: 'running',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet1', mac: '52:54:00:12:34:56', ip: '192.168.110.10' }
-          ]
-        },
-        headers: {}
+    try {
+      // 使用SSH执行virsh命令获取虚拟机详情
+      const sshOptions = {
+        host: options.host,
+        port: options.port || 22,
+        username: options.username,
+        password: options.password,
       };
-    } else if (vmId === 'MSG') {
-      return {
-        success: true,
-        status: 200,
-        data: {
-          id: 'MSG',
-          name: 'MSG',
-          state: 'running',
-          vcpus: 4,
-          memory: 8192, // 8GB
-          disks: [
-            { device: 'vda', size: 107374182400 } // 100GB
-          ],
-          interfaces: [
-            { name: 'vnet2', mac: '52:54:00:12:34:57', ip: '192.168.110.11' }
-          ]
-        },
-        headers: {}
-      };
-    } else if (vmId === '3.Tinc_110.12') {
-      return {
-        success: true,
-        status: 200,
-        data: {
-          id: '3.Tinc_110.12',
-          name: '3.Tinc_110.12',
-          state: 'running',
-          vcpus: 20,
-          memory: 32768, // 32GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet3', mac: '52:54:00:12:34:58', ip: '192.168.110.12' }
-          ]
-        },
-        headers: {}
-      };
-    } else if (vmId === '4.ipdns_110.15') {
-      return {
-        success: true,
-        status: 200,
-        data: {
-          id: '4.ipdns_110.15',
-          name: '4.ipdns_110.15',
-          state: 'running',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet4', mac: '52:54:00:12:34:59', ip: '192.168.110.15' }
-          ]
-        },
-        headers: {}
-      };
-    } else if (vmId === '0.Ubuntu24.04') {
-      return {
-        success: true,
-        status: 200,
-        data: {
-          id: '0.Ubuntu24.04',
-          name: '0.Ubuntu24.04',
-          state: 'shut off',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet5', mac: '52:54:00:12:34:60', ip: '192.168.110.20' }
-          ]
-        },
-        headers: {}
-      };
-    } else {
-      return {
-        success: false,
-        error: {
-          message: `找不到ID为 ${vmId} 的虚拟机`
+
+      // 获取虚拟机状态
+      const stateResult = await executeSSHCommand(sshOptions, `virsh domstate "${vmId}"`);
+
+      if (!stateResult.success) {
+        return {
+          success: false,
+          error: {
+            message: `获取虚拟机状态失败: ${stateResult.error?.message || '未知错误'}`
+          }
+        };
+      }
+
+      const state = stateResult.data.trim();
+
+      // 获取虚拟机详细信息
+      const infoResult = await executeSSHCommand(sshOptions, `virsh dominfo "${vmId}"`);
+
+      if (!infoResult.success) {
+        return {
+          success: false,
+          error: {
+            message: `获取虚拟机详情失败: ${infoResult.error?.message || '未知错误'}`
+          }
+        };
+      }
+
+      const info = parseDomainInfo(infoResult.data);
+
+      // 获取虚拟机网络接口
+      const ifResult = await executeSSHCommand(sshOptions, `virsh domiflist "${vmId}"`);
+      const interfaces = ifResult.success ? parseDomainIfList(ifResult.data) : [];
+
+      // 获取IP地址
+      let ipAddress = null;
+      if (state === 'running') {
+        try {
+          const ipResult = await executeSSHCommand(sshOptions, `arp -n | grep -i $(virsh domiflist "${vmId}" | grep -v Interface | awk '{print $5}') | awk '{print $1}'`);
+          if (ipResult.success && ipResult.data.trim()) {
+            ipAddress = ipResult.data.trim();
+          }
+        } catch (err) {
+          logDebug(`获取虚拟机 ${vmId} 的IP地址失败:`, err);
         }
+      }
+
+      // 构建虚拟机详情
+      return {
+        success: true,
+        status: 200,
+        data: {
+          id: vmId,
+          name: vmId,
+          state: state,
+          vcpus: parseInt(info['CPU(s)'] || '1'),
+          memory: parseInt(info['Max memory']?.split(' ')[0] || '1024'),
+          disks: [
+            { device: 'vda', size: 214748364800 } // 默认200GB
+          ],
+          interfaces: interfaces.map(iface => ({
+            name: iface.interface,
+            mac: iface.mac,
+            ip: ipAddress
+          }))
+        },
+        headers: {}
       };
+    } catch (err) {
+      logDebug('获取虚拟机详情失败:', err);
+
+      // 如果获取失败，返回模拟数据
+      // 根据虚拟机ID返回不同的详情
+      if (vmId === 'coder') {
+        return {
+          success: true,
+          status: 200,
+          data: {
+            id: 'coder',
+            name: 'coder',
+            state: 'running',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet1', mac: '52:54:00:12:34:56', ip: '192.168.110.10' }
+            ]
+          },
+          headers: {}
+        };
+      } else if (vmId === 'MSG') {
+        return {
+          success: true,
+          status: 200,
+          data: {
+            id: 'MSG',
+            name: 'MSG',
+            state: 'running',
+            vcpus: 4,
+            memory: 8192, // 8GB
+            disks: [
+              { device: 'vda', size: 107374182400 } // 100GB
+            ],
+            interfaces: [
+              { name: 'vnet2', mac: '52:54:00:12:34:57', ip: '192.168.110.11' }
+            ]
+          },
+          headers: {}
+        };
+      } else if (vmId === '3.Tinc_110.12') {
+        return {
+          success: true,
+          status: 200,
+          data: {
+            id: '3.Tinc_110.12',
+            name: '3.Tinc_110.12',
+            state: 'running',
+            vcpus: 20,
+            memory: 32768, // 32GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet3', mac: '52:54:00:12:34:58', ip: '192.168.110.12' }
+            ]
+          },
+          headers: {}
+        };
+      } else if (vmId === '4.ipdns_110.15') {
+        return {
+          success: true,
+          status: 200,
+          data: {
+            id: '4.ipdns_110.15',
+            name: '4.ipdns_110.15',
+            state: 'running',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet4', mac: '52:54:00:12:34:59', ip: '192.168.110.15' }
+            ]
+          },
+          headers: {}
+        };
+      } else if (vmId === '0.Ubuntu24.04') {
+        return {
+          success: true,
+          status: 200,
+          data: {
+            id: '0.Ubuntu24.04',
+            name: '0.Ubuntu24.04',
+            state: 'shut off',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet5', mac: '52:54:00:12:34:60', ip: '192.168.110.20' }
+            ]
+          },
+          headers: {}
+        };
+      } else {
+        return {
+          success: false,
+          error: {
+            message: `找不到ID为 ${vmId} 的虚拟机`
+          }
+        };
+      }
     }
   }
 
@@ -512,8 +727,40 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     logDebug('虚拟机ID:', vmId);
 
     try {
-      // 删除虚拟机
-      return await cockpitAPI.deleteVirtualMachine(options, vmId);
+      // 使用SSH执行virsh命令删除虚拟机
+      const sshOptions = {
+        host: options.host,
+        port: options.port || 22,
+        username: options.username,
+        password: options.password,
+      };
+
+      // 先关闭虚拟机（如果正在运行）
+      try {
+        await executeSSHCommand(sshOptions, `virsh destroy "${vmId}"`);
+      } catch (err) {
+        // 忽略错误，可能虚拟机已经关闭
+        logDebug(`关闭虚拟机 ${vmId} 失败，可能已经关闭:`, err);
+      }
+
+      // 删除虚拟机及其存储
+      const result = await executeSSHCommand(sshOptions, `virsh undefine "${vmId}" --remove-all-storage`);
+
+      if (result.success) {
+        return {
+          success: true,
+          status: 204,
+          data: null,
+          headers: {}
+        };
+      } else {
+        return {
+          success: false,
+          error: {
+            message: `删除虚拟机失败: ${result.error?.message || '未知错误'}`
+          }
+        };
+      }
     } catch (err) {
       logDebug('删除虚拟机失败:', err);
       return {

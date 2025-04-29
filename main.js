@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { Client } = require('ssh2');
-const cockpitAPI = require('./cockpit-api');
+const cockpitAPI = require('./cockpit-api-http');
 const Store = require('electron-store');
 
 // 创建存储实例
@@ -232,6 +232,10 @@ ipcMain.handle('cockpit-api', async (event, options) => {
 
   // 打印请求URL和方法，方便调试
   console.log(`[API请求] ${options.method.toUpperCase()} ${options.url}`);
+
+  // 强制使用root用户和密码0147
+  options.username = 'root';
+  options.password = '0147';
 
   // 获取虚拟机列表
   if (options.url === '/api/machines' && options.method === 'get') {

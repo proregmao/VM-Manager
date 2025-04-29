@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, InputNumber, Select, message } from 'antd';
 import { v4 as uuidv4 } from 'uuid';
+import mockApi from '../utils/mockApi';
 
 const { Option } = Select;
 
@@ -49,7 +50,9 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
       console.log(`${isEdit ? '更新' : '创建'}虚拟机API请求选项:`, JSON.stringify(apiOptions, null, 2));
 
       // 调用API保存虚拟机
-      const response = await window.electronAPI.cockpitAPI(apiOptions);
+      const api = window.electronAPI?.cockpitAPI ? window.electronAPI : mockApi;
+      console.log('使用API:', api === window.electronAPI ? 'Electron API' : '模拟API');
+      const response = await api.cockpitAPI(apiOptions);
 
       if (response.success) {
         message.success(isEdit ? '虚拟机已更新' : '虚拟机已创建');

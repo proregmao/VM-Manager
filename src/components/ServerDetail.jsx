@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Row, Col, Spin, Typography, Tag, Space, Modal, message } from 'antd';
 import { EditOutlined, DeleteOutlined, ReloadOutlined, PoweroffOutlined, PlayCircleOutlined, PauseCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import VMForm from './VMForm';
+import mockApi from '../utils/mockApi';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -85,8 +86,8 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
       setLoading(true);
       setError(null);
 
-      // 调用Cockpit API获取虚拟机列表
-      const response = await window.electronAPI.cockpitAPI({
+      // 构建API请求选项
+      const apiOptions = {
         url: '/api/machines',
         method: 'get',
         host: server.host,
@@ -95,7 +96,14 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
         password: server.password,
         privateKeyPath: server.privateKeyPath,
         passphrase: server.passphrase,
-      });
+      };
+
+      console.log('获取虚拟机列表API请求选项:', JSON.stringify(apiOptions, null, 2));
+
+      // 调用Cockpit API获取虚拟机列表
+      const api = window.electronAPI?.cockpitAPI ? window.electronAPI : mockApi;
+      console.log('使用API:', api === window.electronAPI ? 'Electron API' : '模拟API');
+      const response = await api.cockpitAPI(apiOptions);
 
       if (response.success) {
         // 调试输出
@@ -150,6 +158,9 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
 
   // 执行虚拟机操作
   const handleVMAction = async (vmId, action) => {
+    // 检查window.electronAPI是否存在
+    console.log('window.electronAPI:', window.electronAPI);
+
     if (!server || !vmId || !action) {
       console.error('执行虚拟机操作失败: 缺少必要参数', { server, vmId, action });
       return;
@@ -176,7 +187,9 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
       console.log('API请求选项:', JSON.stringify(apiOptions, null, 2));
 
       // 调用Cockpit API执行操作
-      const response = await window.electronAPI.cockpitAPI(apiOptions);
+      const api = window.electronAPI?.cockpitAPI ? window.electronAPI : mockApi;
+      console.log('使用API:', api === window.electronAPI ? 'Electron API' : '模拟API');
+      const response = await api.cockpitAPI(apiOptions);
 
       if (response.success) {
         message.success(`操作 ${action} 成功`);
@@ -242,7 +255,10 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
 
           console.log('删除虚拟机API请求选项:', JSON.stringify(apiOptions, null, 2));
 
-          const response = await window.electronAPI.cockpitAPI(apiOptions);
+          // 调用Cockpit API删除虚拟机
+          const api = window.electronAPI?.cockpitAPI ? window.electronAPI : mockApi;
+          console.log('使用API:', api === window.electronAPI ? 'Electron API' : '模拟API');
+          const response = await api.cockpitAPI(apiOptions);
 
           if (response.success) {
             message.success(`虚拟机 ${vmName} 已删除`);
@@ -358,7 +374,10 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
                       <>
                         <Button
                           icon={<PoweroffOutlined />}
-                          onClick={() => handleVMAction(vm.id, 'shutdown')}
+                          onClick={() => {
+                            console.log('点击关闭按钮，虚拟机ID:', vm.id);
+                            handleVMAction(vm.id, 'shutdown');
+                          }}
                           loading={actionLoading[vm.id + 'shutdown']}
                         >
                           关闭

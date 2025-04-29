@@ -1,0 +1,102 @@
+.app-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #f0f2f5;
+  border-right: 1px solid #e8e8e8;
+  overflow-y: auto;
+}
+
+.content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.server-list {
+  margin-top: 10px;
+}
+
+.server-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.server-item:hover {
+  background-color: #e6f7ff;
+}
+
+.server-item.active {
+  background-color: #e6f7ff;
+  border-right: 3px solid #1890ff;
+}
+
+.server-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 0 16px;
+}
+
+.vm-card {
+  margin-bottom: 16px;
+}
+
+.vm-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.vm-status.running {
+  background-color: #52c41a;
+}
+
+.vm-status.paused {
+  background-color: #faad14;
+}
+
+.vm-status.shut-off {
+  background-color: #ff4d4f;
+}
+
+.vm-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vm-details {
+  margin-top: 8px;
+}
+
+.vm-details-item {
+  margin-bottom: 4px;
+}
+
+.server-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-actions {
+  margin-top: 24px;
+  text-align: right;
+}
+
+.error-message {
+  color: #ff4d4f;
+  margin-bottom: 16px;
+}

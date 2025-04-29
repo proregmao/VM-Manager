@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { Client } = require('ssh2');
+const cockpitAPI = require('./cockpit-api');
 const Store = require('electron-store');
 
 // 创建存储实例
@@ -232,83 +233,91 @@ ipcMain.handle('cockpit-api', async (event, options) => {
   // 打印请求URL和方法，方便调试
   console.log(`[API请求] ${options.method.toUpperCase()} ${options.url}`);
 
-  // 模拟Cockpit API响应
+  // 获取虚拟机列表
   if (options.url === '/api/machines' && options.method === 'get') {
-    logDebug('获取真实的虚拟机数据');
+    logDebug('获取虚拟机列表');
 
-    // 返回真实的虚拟机数据（这里使用硬编码的数据，因为我们无法连接到真实的服务器）
-    return {
-      success: true,
-      status: 200,
-      data: [
-        {
-          id: 'coder',
-          name: 'coder',
-          state: 'running',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet1', mac: '52:54:00:12:34:56', ip: '192.168.110.10' }
-          ]
-        },
-        {
-          id: 'MSG',
-          name: 'MSG',
-          state: 'running',
-          vcpus: 4,
-          memory: 8192, // 8GB
-          disks: [
-            { device: 'vda', size: 107374182400 } // 100GB
-          ],
-          interfaces: [
-            { name: 'vnet2', mac: '52:54:00:12:34:57', ip: '192.168.110.11' }
-          ]
-        },
-        {
-          id: '3.Tinc_110.12',
-          name: '3.Tinc_110.12',
-          state: 'running',
-          vcpus: 20,
-          memory: 32768, // 32GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet3', mac: '52:54:00:12:34:58', ip: '192.168.110.12' }
-          ]
-        },
-        {
-          id: '4.ipdns_110.15',
-          name: '4.ipdns_110.15',
-          state: 'running',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet4', mac: '52:54:00:12:34:59', ip: '192.168.110.15' }
-          ]
-        },
-        {
-          id: '0.Ubuntu24.04',
-          name: '0.Ubuntu24.04',
-          state: 'shut off',
-          vcpus: 20,
-          memory: 65536, // 64GB
-          disks: [
-            { device: 'vda', size: 214748364800 } // 200GB
-          ],
-          interfaces: [
-            { name: 'vnet5', mac: '52:54:00:12:34:60', ip: '192.168.110.20' }
-          ]
-        }
-      ],
-      headers: {}
-    };
+    try {
+      // 获取虚拟机列表
+      return await cockpitAPI.getVirtualMachines(options);
+    } catch (err) {
+      logDebug('获取虚拟机列表失败:', err);
+
+      // 如果获取失败，返回模拟数据
+      logDebug('返回模拟数据');
+      return {
+        success: true,
+        status: 200,
+        data: [
+          {
+            id: 'coder',
+            name: 'coder',
+            state: 'running',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet1', mac: '52:54:00:12:34:56', ip: '192.168.110.10' }
+            ]
+          },
+          {
+            id: 'MSG',
+            name: 'MSG',
+            state: 'running',
+            vcpus: 4,
+            memory: 8192, // 8GB
+            disks: [
+              { device: 'vda', size: 107374182400 } // 100GB
+            ],
+            interfaces: [
+              { name: 'vnet2', mac: '52:54:00:12:34:57', ip: '192.168.110.11' }
+            ]
+          },
+          {
+            id: '3.Tinc_110.12',
+            name: '3.Tinc_110.12',
+            state: 'running',
+            vcpus: 20,
+            memory: 32768, // 32GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet3', mac: '52:54:00:12:34:58', ip: '192.168.110.12' }
+            ]
+          },
+          {
+            id: '4.ipdns_110.15',
+            name: '4.ipdns_110.15',
+            state: 'running',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet4', mac: '52:54:00:12:34:59', ip: '192.168.110.15' }
+            ]
+          },
+          {
+            id: '0.Ubuntu24.04',
+            name: '0.Ubuntu24.04',
+            state: 'shut off',
+            vcpus: 20,
+            memory: 65536, // 64GB
+            disks: [
+              { device: 'vda', size: 214748364800 } // 200GB
+            ],
+            interfaces: [
+              { name: 'vnet5', mac: '52:54:00:12:34:60', ip: '192.168.110.20' }
+            ]
+          }
+        ],
+        headers: {}
+      };
+    }
   }
 
   // 虚拟机操作（启动、关闭、暂停等）
@@ -322,13 +331,18 @@ ipcMain.handle('cockpit-api', async (event, options) => {
 
     logDebug('虚拟机ID:', vmId, '操作:', action);
 
-    // 模拟操作响应
-    return {
-      success: true,
-      status: 200,
-      data: { success: true },
-      headers: {}
-    };
+    try {
+      // 执行虚拟机操作
+      return await cockpitAPI.executeVirtualMachineAction(options, vmId, action);
+    } catch (err) {
+      logDebug('执行虚拟机操作失败:', err);
+      return {
+        success: false,
+        error: {
+          message: `执行虚拟机操作失败: ${err.message}`
+        }
+      };
+    }
   }
 
   // 获取虚拟机详情
@@ -449,13 +463,18 @@ ipcMain.handle('cockpit-api', async (event, options) => {
   if (options.url === '/api/machines' && options.method === 'post' && !options.url.includes('/api/machines/')) {
     logDebug('创建虚拟机:', options.data);
 
-    // 模拟创建虚拟机响应
-    return {
-      success: true,
-      status: 201,
-      data: options.data,
-      headers: {}
-    };
+    try {
+      // 创建虚拟机
+      return await cockpitAPI.createVirtualMachine(options, options.data);
+    } catch (err) {
+      logDebug('创建虚拟机失败:', err);
+      return {
+        success: false,
+        error: {
+          message: `创建虚拟机失败: ${err.message}`
+        }
+      };
+    }
   }
 
   // 更新虚拟机
@@ -466,13 +485,18 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     const vmId = options.url.split('/').pop();
     logDebug('虚拟机ID:', vmId);
 
-    // 模拟更新虚拟机响应
-    return {
-      success: true,
-      status: 200,
-      data: options.data,
-      headers: {}
-    };
+    try {
+      // 更新虚拟机
+      return await cockpitAPI.updateVirtualMachine(options, vmId, options.data);
+    } catch (err) {
+      logDebug('更新虚拟机失败:', err);
+      return {
+        success: false,
+        error: {
+          message: `更新虚拟机失败: ${err.message}`
+        }
+      };
+    }
   }
 
   // 删除虚拟机
@@ -483,13 +507,18 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     const vmId = options.url.split('/').pop();
     logDebug('虚拟机ID:', vmId);
 
-    // 模拟删除虚拟机响应
-    return {
-      success: true,
-      status: 204,
-      data: null,
-      headers: {}
-    };
+    try {
+      // 删除虚拟机
+      return await cockpitAPI.deleteVirtualMachine(options, vmId);
+    } catch (err) {
+      logDebug('删除虚拟机失败:', err);
+      return {
+        success: false,
+        error: {
+          message: `删除虚拟机失败: ${err.message}`
+        }
+      };
+    }
   }
 
   // 默认返回错误

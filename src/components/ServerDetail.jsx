@@ -350,21 +350,15 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
                   <div>
                     <span style={{ color: '#666' }}>网络: </span>
                     <span>
-                      {vm.interfaces.map((iface, index) => {
-                        // 调试输出
-                        console.log(`虚拟机 ${vm.name} 的网络接口 ${iface.name}:`, JSON.stringify(iface));
-
-                        // 检查IP地址是否存在
-                        const hasIp = iface.ip && iface.ip !== 'undefined' && iface.ip !== '';
-
-                        return (
-                          <span key={index}>
-                            {iface.name}
-                            {hasIp && ` IP地址: ${iface.ip}`}
-                            {index < vm.interfaces.length - 1 ? ', ' : ''}
-                          </span>
-                        );
-                      })}
+                      {vm.interfaces.map((iface, index) => iface.name)}
+                    </span>
+                  </div>
+                )}
+                {vm.interfaces && vm.interfaces.length > 0 && vm.interfaces[0].ip && (
+                  <div>
+                    <span style={{ color: '#666' }}>IP地址: </span>
+                    <span>
+                      {vm.interfaces[0].ip}
                     </span>
                   </div>
                 )}

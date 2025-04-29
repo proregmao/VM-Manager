@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Row, Col, Spin, Typography, Tag, Space, Modal, message } from 'antd';
-import { EditOutlined, DeleteOutlined, ReloadOutlined, PoweroffOutlined, PlayCircleOutlined, PauseCircleOutlined, ExportOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ReloadOutlined, PoweroffOutlined, PlayCircleOutlined, PauseCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import VMForm from './VMForm';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -73,6 +74,8 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
+  const [showVMForm, setShowVMForm] = useState(false);
+  const [editingVM, setEditingVM] = useState(null);
 
   // 加载虚拟机列表
   const loadVMs = async () => {
@@ -191,6 +194,63 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
     window.open(url, '_blank');
   };
 
+  // 添加虚拟机
+  const handleAddVM = () => {
+    setEditingVM(null);
+    setShowVMForm(true);
+  };
+
+  // 编辑虚拟机
+  const handleEditVM = (vm) => {
+    setEditingVM(vm);
+    setShowVMForm(true);
+  };
+
+  // 删除虚拟机
+  const handleDeleteVM = (vmId, vmName) => {
+    confirm({
+      title: '确认删除',
+      content: `确定要删除虚拟机 "${vmName}" 吗？此操作不可恢复！`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          setActionLoading(prev => ({ ...prev, [vmId + 'delete']: true }));
+
+          const response = await window.electronAPI.cockpitAPI({
+            url: `/api/machines/${vmId}`,
+            method: 'delete',
+            host: server.host,
+            port: server.cockpitPort,
+            username: server.username,
+            password: server.password,
+            privateKeyPath: server.privateKeyPath,
+            passphrase: server.passphrase,
+          });
+
+          if (response.success) {
+            message.success(`虚拟机 ${vmName} 已删除`);
+            loadVMs();
+          } else {
+            message.error(`删除虚拟机失败: ${response.error?.message || '未知错误'}`);
+          }
+        } catch (err) {
+          console.error('删除虚拟机异常:', err);
+          message.error(`删除虚拟机异常: ${err.message || '未知错误'}`);
+        } finally {
+          setActionLoading(prev => ({ ...prev, [vmId + 'delete']: false }));
+        }
+      },
+    });
+  };
+
+  // 保存虚拟机
+  const handleSaveVM = async (vmData) => {
+    setShowVMForm(false);
+    await loadVMs();
+  };
+
   if (!server) {
     return (
       <div style={{ textAlign: 'center', marginTop: '100px' }}>
@@ -247,7 +307,12 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
         </Row>
       </Card>
 
-      <Title level={4}>虚拟机列表</Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <Title level={4} style={{ margin: 0 }}>虚拟机列表</Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAddVM}>
+          添加虚拟机
+        </Button>
+      </div>
 
       {error && (
         <div style={{ color: 'red', marginBottom: '16px' }}>
@@ -327,6 +392,20 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
                     >
                       重启
                     </Button>
+                    <Button
+                      icon={<EditOutlined />}
+                      onClick={() => handleEditVM(vm)}
+                    >
+                      编辑
+                    </Button>
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleDeleteVM(vm.id, vm.name)}
+                      loading={actionLoading[vm.id + 'delete']}
+                    >
+                      删除
+                    </Button>
                   </Space>
                 </div>
               }
@@ -370,6 +449,16 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
             <p>没有找到虚拟机</p>
           </div>
         )
+      )}
+
+      {showVMForm && (
+        <VMForm
+          vm={editingVM}
+          server={server}
+          onSave={handleSaveVM}
+          onCancel={() => setShowVMForm(false)}
+          loading={loading}
+        />
       )}
     </div>
   );

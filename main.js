@@ -193,10 +193,10 @@ ipcMain.handle('select-private-key', async () => {
 ipcMain.handle('save-server', (event, server) => {
   logDebug('保存服务器配置:', server);
   const servers = store.get('servers', []);
-  
+
   // 检查是否已存在相同ID的服务器
   const index = servers.findIndex(s => s.id === server.id);
-  
+
   if (index !== -1) {
     // 更新现有服务器
     servers[index] = server;
@@ -204,7 +204,7 @@ ipcMain.handle('save-server', (event, server) => {
     // 添加新服务器
     servers.push(server);
   }
-  
+
   store.set('servers', servers);
   return { success: true, message: '服务器配置已保存' };
 });
@@ -311,14 +311,14 @@ ipcMain.handle('cockpit-api', async (event, options) => {
   // 虚拟机操作
   if (options.url && options.url.includes('/api/machines/') && options.method === 'post') {
     logDebug('虚拟机操作');
-    
+
     // 获取虚拟机ID和操作
     const parts = options.url.split('/');
     const vmId = parts[parts.length - 2];
     const action = parts[parts.length - 1];
-    
+
     logDebug('虚拟机ID:', vmId, '操作:', action);
-    
+
     // 模拟操作响应
     return {
       success: true,
@@ -331,7 +331,7 @@ ipcMain.handle('cockpit-api', async (event, options) => {
   // 获取虚拟机详情
   if (options.url && options.url.includes('/api/machines/') && options.method === 'get' && !options.url.includes('/screenshot')) {
     logDebug('获取虚拟机详情');
-    
+
     // 获取虚拟机ID
     const vmId = options.url.split('/').pop();
     logDebug('虚拟机ID:', vmId);
@@ -440,6 +440,53 @@ ipcMain.handle('cockpit-api', async (event, options) => {
         }
       };
     }
+  }
+
+  // 创建虚拟机
+  if (options.url === '/api/machines' && options.method === 'post') {
+    logDebug('创建虚拟机:', options.data);
+
+    // 模拟创建虚拟机响应
+    return {
+      success: true,
+      status: 201,
+      data: options.data,
+      headers: {}
+    };
+  }
+
+  // 更新虚拟机
+  if (options.url && options.url.includes('/api/machines/') && options.method === 'put' && !options.url.includes('/screenshot')) {
+    logDebug('更新虚拟机:', options.data);
+
+    // 获取虚拟机ID
+    const vmId = options.url.split('/').pop();
+    logDebug('虚拟机ID:', vmId);
+
+    // 模拟更新虚拟机响应
+    return {
+      success: true,
+      status: 200,
+      data: options.data,
+      headers: {}
+    };
+  }
+
+  // 删除虚拟机
+  if (options.url && options.url.includes('/api/machines/') && options.method === 'delete') {
+    logDebug('删除虚拟机');
+
+    // 获取虚拟机ID
+    const vmId = options.url.split('/').pop();
+    logDebug('虚拟机ID:', vmId);
+
+    // 模拟删除虚拟机响应
+    return {
+      success: true,
+      status: 204,
+      data: null,
+      headers: {}
+    };
   }
 
   // 默认返回错误

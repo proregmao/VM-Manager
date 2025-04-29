@@ -32,9 +32,9 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
           }
         ]
       };
-      
-      // 调用API保存虚拟机
-      const response = await window.electronAPI.cockpitAPI({
+
+      // 构建API请求选项
+      const apiOptions = {
         url: isEdit ? `/api/machines/${vm.id}` : '/api/machines',
         method: isEdit ? 'put' : 'post',
         data: vmData,
@@ -44,8 +44,13 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         password: server.password,
         privateKeyPath: server.privateKeyPath,
         passphrase: server.passphrase,
-      });
-      
+      };
+
+      console.log(`${isEdit ? '更新' : '创建'}虚拟机API请求选项:`, JSON.stringify(apiOptions, null, 2));
+
+      // 调用API保存虚拟机
+      const response = await window.electronAPI.cockpitAPI(apiOptions);
+
       if (response.success) {
         message.success(isEdit ? '虚拟机已更新' : '虚拟机已创建');
         onSave(vmData);
@@ -84,7 +89,7 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         >
           <Input placeholder="虚拟机名称" />
         </Form.Item>
-        
+
         <Form.Item
           name="vcpus"
           label="CPU核心数"
@@ -92,7 +97,7 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         >
           <InputNumber min={1} max={64} style={{ width: '100%' }} />
         </Form.Item>
-        
+
         <Form.Item
           name="memory"
           label="内存 (GB)"
@@ -100,7 +105,7 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         >
           <InputNumber min={1} max={256} style={{ width: '100%' }} />
         </Form.Item>
-        
+
         <Form.Item
           name="diskSize"
           label="磁盘大小 (GB)"
@@ -108,7 +113,7 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         >
           <InputNumber min={1} max={2000} style={{ width: '100%' }} />
         </Form.Item>
-        
+
         <Form.Item
           name="networkInterface"
           label="网络接口"
@@ -127,14 +132,14 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
             <Option value="vnet9">vnet9</Option>
           </Select>
         </Form.Item>
-        
+
         <Form.Item
           name="macAddress"
           label="MAC地址 (可选)"
         >
           <Input placeholder="例如: 52:54:00:12:34:56" />
         </Form.Item>
-        
+
         <Form.Item
           name="ipAddress"
           label="IP地址"
@@ -142,7 +147,7 @@ const VMForm = ({ vm, server, onSave, onCancel, loading }) => {
         >
           <Input placeholder="例如: 192.168.110.10" />
         </Form.Item>
-        
+
         <div style={{ textAlign: 'right', marginTop: 24 }}>
           <Button onClick={onCancel} style={{ marginRight: 8 }}>
             取消

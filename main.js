@@ -227,7 +227,10 @@ ipcMain.handle('delete-server', (event, serverId) => {
 
 // 处理Cockpit API请求
 ipcMain.handle('cockpit-api', async (event, options) => {
-  logDebug('Cockpit API请求:', options);
+  logDebug('Cockpit API请求:', JSON.stringify(options, null, 2));
+
+  // 打印请求URL和方法，方便调试
+  console.log(`[API请求] ${options.method.toUpperCase()} ${options.url}`);
 
   // 模拟Cockpit API响应
   if (options.url === '/api/machines' && options.method === 'get') {
@@ -308,8 +311,8 @@ ipcMain.handle('cockpit-api', async (event, options) => {
     };
   }
 
-  // 虚拟机操作
-  if (options.url && options.url.includes('/api/machines/') && options.method === 'post') {
+  // 虚拟机操作（启动、关闭、暂停等）
+  if (options.url && options.url.includes('/api/machines/') && options.method === 'post' && options.url.split('/').length >= 4) {
     logDebug('虚拟机操作');
 
     // 获取虚拟机ID和操作
@@ -443,7 +446,7 @@ ipcMain.handle('cockpit-api', async (event, options) => {
   }
 
   // 创建虚拟机
-  if (options.url === '/api/machines' && options.method === 'post') {
+  if (options.url === '/api/machines' && options.method === 'post' && !options.url.includes('/api/machines/')) {
     logDebug('创建虚拟机:', options.data);
 
     // 模拟创建虚拟机响应

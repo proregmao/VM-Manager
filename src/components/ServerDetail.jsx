@@ -150,14 +150,19 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
 
   // 执行虚拟机操作
   const handleVMAction = async (vmId, action) => {
-    if (!server || !vmId || !action) return;
+    if (!server || !vmId || !action) {
+      console.error('执行虚拟机操作失败: 缺少必要参数', { server, vmId, action });
+      return;
+    }
 
     try {
+      console.log(`准备执行虚拟机操作: ${action} 虚拟机ID: ${vmId}`);
+
       // 设置操作加载状态
       setActionLoading(prev => ({ ...prev, [vmId + action]: true }));
 
-      // 调用Cockpit API执行操作
-      const response = await window.electronAPI.cockpitAPI({
+      // 构建API请求选项
+      const apiOptions = {
         url: `/api/machines/${vmId}/${action}`,
         method: 'post',
         host: server.host,
@@ -166,7 +171,12 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
         password: server.password,
         privateKeyPath: server.privateKeyPath,
         passphrase: server.passphrase,
-      });
+      };
+
+      console.log('API请求选项:', JSON.stringify(apiOptions, null, 2));
+
+      // 调用Cockpit API执行操作
+      const response = await window.electronAPI.cockpitAPI(apiOptions);
 
       if (response.success) {
         message.success(`操作 ${action} 成功`);
@@ -218,7 +228,8 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
         try {
           setActionLoading(prev => ({ ...prev, [vmId + 'delete']: true }));
 
-          const response = await window.electronAPI.cockpitAPI({
+          // 构建API请求选项
+          const apiOptions = {
             url: `/api/machines/${vmId}`,
             method: 'delete',
             host: server.host,
@@ -227,7 +238,11 @@ const ServerDetail = ({ server, onEdit, onDelete, loading: propLoading }) => {
             password: server.password,
             privateKeyPath: server.privateKeyPath,
             passphrase: server.passphrase,
-          });
+          };
+
+          console.log('删除虚拟机API请求选项:', JSON.stringify(apiOptions, null, 2));
+
+          const response = await window.electronAPI.cockpitAPI(apiOptions);
 
           if (response.success) {
             message.success(`虚拟机 ${vmName} 已删除`);
